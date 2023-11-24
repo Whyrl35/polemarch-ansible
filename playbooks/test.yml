@@ -1,0 +1,12 @@
+---
+- name: Test playbook
+  hosts: "{{ target }}"
+  gather_facts: no
+
+  tasks:
+    - name: Debug
+      debug:
+        var: hostvars[inventory_hostname]
+
+    - name: Ping
+      ping:
