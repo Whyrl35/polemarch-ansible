@@ -8,7 +8,7 @@
       debug:
         msg: "Will upgrade package on host"
 
-    - name: rebooting
+    - name: Upgrading package
       apt:
         name: "*"
         state: latest
