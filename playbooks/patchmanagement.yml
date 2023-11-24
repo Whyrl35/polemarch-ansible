@@ -1,0 +1,96 @@
+---
+- name: "IMPORT | Pre play"
+  import_playbook: "{{ playbook_dir }}/patchmanagement/pre_play.yml"
+
+- name: PATCH MANAGEMENT | Linux Job
+  hosts:
+    - "{{ target }}"
+  gather_facts: true
+  user: ansible
+
+  tasks:
+    # Lancement du job
+    - name: "PLAY | Linux Patch Management Job"
+      debug:
+        msg: "Start {{ inventory_hostname_short }} patch management"
+
+    - name: Gather facts
+      setup:
+        gather_subset:
+          - 'all'
+
+    # Mise en maintenance du projet en utilisant le module maintenance développé par EDL
+    # Mettre ici une maintenance sur UptimeKuma et Grafana (?)
+    # - name: "MAINTENANCE | Project global maintenance"
+
+    # On crée un dossier pour prise de notes
+    - name: "NOTES | create /root/patchmanagement"
+      become: true
+      file:
+        path: /root/patchmanagement
+        state: directory
+
+    # On prend des notes sur l'état du système avant le patchmanagement, au cas où
+    - name: "NOTES | take some notes on the system's state"
+      become: true
+      shell: ip a > /root/patchmanagement/patchmanagement_$(date +"%Y%m%d").log && echo "" >> /root/patchmanagement/patchmanagement_$(date +"%Y%m%d").log && ip r >> /root/patchmanagement/patchmanagement_$(date +"%Y%m%d").log && echo "" >> /root/patchmanagement/patchmanagement_$(date +"%Y%m%d").log && ps auxfww >> /root/patchmanagement/patchmanagement_$(date +"%Y%m%d").log && echo "" >> /root/patchmanagement/patchmanagement_$(date +"%Y%m%d").log && mount >> /root/patchmanagement/patchmanagement_$(date +"%Y%m%d").log
+      ignore_errors: true
+      changed_when: false
+
+    # Vérification si un playbook custom before existe, à la manière d'ansistrano
+    - name: "CHECK | Does before_pm_{{ inventory_hostname_short }}_custom_tasks.yml playbook exist ?"
+      stat:
+        path: "{{ playbook_dir }}/patchmanagement/before_pm_{{ inventory_hostname_short }}_custom_tasks.yml"
+      delegate_to: localhost
+      register: custom_before
+
+    # Joue l'include si le playbook custom existe pour ce host
+    - name: "INCLUDE | before_pm_{{ inventory_hostname_short }}_custom_tasks.yml exists"
+      include_tasks: "{{ playbook_dir }}/patchmanagement/before_pm_{{ inventory_hostname_short }}_custom_tasks.yml"
+      when:
+        - custom_before is defined
+        - custom_before.stat.exists
+
+    # Include des actions DEBIAN / UBUNTU
+    - name: "INCLUDE | Debian & Ubuntu playbook (if needed)"
+      include_tasks: "{{ playbook_dir }}/patchmanagement/debian_ubuntu.yml"
+      when:
+        - (ansible_distribution == 'Debian' or ansible_distribution == 'Ubuntu') and not dry_run|bool
+
+    # Include des actions CENTOS / REDHAT
+    - name: "INCLUDE | CentOS & RedHat playbook (if needed)"
+      include_tasks: "{{ playbook_dir }}/patchmanagement/redhat_centos.yml"
+      when:
+        - (ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux' or ansible_distribution == 'RedHat') and not dry_run|bool
+
+    # On lance un reboot
+    - name: "REBOOT | reboot triggered"
+      reboot:
+        msg: "Reboot initiated by Ansible. Related to Patch Management."
+        reboot_timeout: 720
+        test_command: "whoami"
+        post_reboot_delay: 15
+      changed_when: false
+      become: true
+      become_user: "root"
+
+    - name: "CHECK | ensure we are not in rescue mode"
+      wait_for_connection:
+        timeout: 120
+
+    # Vérification si un playbook custom after existe, à la manière d'ansistrano
+    - name: "CHECK | Does after_pm_{{ inventory_hostname_short }}_custom_tasks.yml playbook exist ?"
+      stat:
+        path: "{{ playbook_dir }}/patchmanagement/after_pm_{{ inventory_hostname_short }}_custom_tasks.yml"
+      delegate_to: localhost
+      register: custom_after
+
+    # Joue l'include si le playbook custom after existe pour ce host
+    - name: "INCLUDE | after_pm_{{ inventory_hostname_short }}_custom_tasks.yml exists"
+      include_tasks: "{{ playbook_dir }}/patchmanagement/after_pm_{{ inventory_hostname_short }}_custom_tasks.yml"
+      when:
+        - custom_after is defined
+        - custom_after.stat.exists
+
+- name: "IMPORT | Post play"
+  import_playbook: "{{ playbook_dir }}/patchmanagement/post_play.yml"

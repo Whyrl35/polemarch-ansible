@@ -1,0 +1,84 @@
+---
+- name: "INCLUDED | RedHat & CentOS playbook"
+  block:
+    - name: 'RHEL CENTOS | yum clean all'
+      command: yum clean all warn=no
+      register: yum_clean_resultat
+
+    - name: 'RHEL CENTOS | Ensure yum-utils is installed'
+      yum:
+        name: yum-utils
+        state: installed
+
+    - name: 'RHEL CENTOS | Remove old kernels v7 and before'
+      command: package-cleanup --oldkernels --count={{ keep_kernels_count | default(2) }} -y
+      register: old_kernel_cleanup
+      when: ansible_distribution_major_version|int <= 7
+
+    - block:
+        - name: 'RHEL CENTOS | Request old kernels v8'
+          command: yum repoquery --quiet --installonly --latest-limit=-{{ keep_kernels_count | default(2) }}
+          register: old_kernel_repoquery
+
+        - name: 'RHEL CENTOS | Remove old kernels v8'
+          command: yum remove -y {{ old_kernel_repoquery.stdout }}
+          register: old_kernel_cleanup
+      when: ansible_distribution_major_version|int == 8
+
+    - name: "CHECK | Do we use sclo repo ?"
+      stat:
+        path: /etc/yum.repos.d/CentOS-7-SCLo-scl.repo
+      register: use_sclo
+
+    # Nous avons un probleme sur le depot SCLo avec ImageMagick
+    # On ne fait rien quand le repo n'est pas utilisé
+    - block:
+        - name: 'RHEL CENTOS | update rpm package (without sclo)'
+          yum: name=* state=latest update_cache=yes security={{ security_only | default('false') }}
+          register: update_resultat
+          environment:
+            ACCEPT_EULA: 'y'
+          retries: 5
+          delay: 60
+          until: update_resultat is succeeded
+
+        - name: 'RHEL CENTOS | Print update result'
+          debug: var=update_resultat
+          when: update_resultat is defined and update_resultat != "" and verbose_package_list is defined and verbose_package_list|bool
+
+      when:
+        - not use_sclo.stat.exists|bool
+
+    # Nous avons un probleme sur le depot SCLo avec ImageMagick
+    # On exclut certains paquet quand le repo est utilisé
+    # Block à supprimer des que le problème sera résolu dans les repos
+    - block:
+        - name: 'RHEL CENTOS | update rpm package (with sclo = exclude imagemagick)'
+          yum: name=* state=latest update_cache=yes security={{ security_only | default('false') }} exclude=ImageMagick*,php-pecl-imagick,sclo-php*-php-pecl-imagick*
+          register: update_resultat
+          environment:
+            ACCEPT_EULA: 'y'
+          retries: 5
+          delay: 60
+          until: update_resultat is succeeded
+
+        - name: 'RHEL CENTOS | Print update result'
+          debug: var=update_resultat
+          when: update_resultat is defined and update_resultat != "" and verbose_package_list is defined and verbose_package_list|bool
+
+      when: use_sclo.stat.exists|bool
+
+  rescue:
+    - name: 'RHEL CENTOS | Print cleanup result'
+      debug: var=update_resultat
+      when: old_kernel_cleanup is defined and old_kernel_cleanup != ""
+
+    - name: 'RHEL CENTOS | Print update result'
+      debug: var=update_resultat
+      when: update_resultat is defined and update_resultat != ""
+
+    - name: 'RHEL CENTOS | Fail'
+      fail:
+        msg: "FAIL : something went wrong ..."
+
+  become: true

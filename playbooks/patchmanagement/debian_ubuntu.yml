@@ -1,0 +1,37 @@
+---
+- name: "INCLUDED | Debian & Ubuntu playbook"
+  block:
+    # Dispo en module natif en 2.13
+    - name: 'DEBIAN UBUNTU | apt-get clean'
+      command: apt-get clean
+      ignore_errors: true
+
+    - name: 'DEBIAN UBUNTU | apt-get autoremove'
+      apt:
+        autoremove: true
+
+    - name: 'DEBIAN UBUNTU | apt-get dist-upgrade'
+      apt:
+        upgrade: "dist"
+        update_cache: true
+      register: update_resultat
+      environment:
+        ACCEPT_EULA: 'y'
+
+    - name: 'DEBIAN UBUNTU | Print update result'
+      debug: var=update_resultat.stdout_lines
+      when: update_resultat is defined and update_resultat != "" and verbose_package_list is defined and verbose_package_list|bool
+
+    - name: 'DEBIAN UBUNTU | apt-get autoremove'
+      apt: autoremove=yes
+
+  rescue:
+    - name: 'DEBIAN UBUNTU | Print update result'
+      debug: var=update_resultat.stdout_lines
+      when: update_resultat is defined and update_resultat != ""
+
+    - name: "DEBIAN UBUNTU | Fail"
+      fail:
+        msg: "FAIL : something went wrong ..."
+
+  become: true

@@ -1,0 +1,27 @@
+---
+- name: PRE-PATCH MANAGEMENT | Pre play
+  hosts: localhost
+  gather_facts: false
+  user: ansible
+  tasks:
+    - name: "CHECK | Target must not have more than 220 characters"
+      assert:
+        that: target | length <= 220
+        fail_msg: The target have more than 220 characters, it will result in more than 255 filename characters which is over filesystem limits. Customs tasks "before anything" could not be loaded. Check the Rundeck job inventory parameter and fix it if needed.
+        # quiet: true #Only supported in Ansible >= 2.8
+      ignore_errors: true
+      register: check_length
+
+    - name: "CHECK | Does before_everything_{{ target }}_custom_tasks.yml file exist ?"
+      stat:
+        path: "{{ playbook_dir }}/../../{{ client }}/patchmanagement/before_everything_{{ target }}_custom_tasks.yml"
+      register: custom_before_everything
+      when:
+        - not check_length.failed
+        - client is defined and client != ""
+
+    - name: "INCLUDE | before_everything_{{ target }}_custom_tasks.yml exists"
+      include_tasks: "{{ custom_before_everything.stat.path }}"
+      when:
+        - custom_before_everything is defined
+        - custom_before_everything.stat.exists |default(false)
