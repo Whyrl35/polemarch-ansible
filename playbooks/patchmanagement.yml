@@ -55,13 +55,13 @@
     - name: "INCLUDE | Debian & Ubuntu playbook (if needed)"
       include_tasks: "{{ playbook_dir }}/patchmanagement/debian_ubuntu.yml"
       when:
-        - (ansible_distribution == 'Debian' or ansible_distribution == 'Ubuntu') and not dry_run|bool
+        - (ansible_distribution == 'Debian' or ansible_distribution == 'Ubuntu')
 
     # Include des actions CENTOS / REDHAT
     - name: "INCLUDE | CentOS & RedHat playbook (if needed)"
       include_tasks: "{{ playbook_dir }}/patchmanagement/redhat_centos.yml"
       when:
-        - (ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux' or ansible_distribution == 'RedHat') and not dry_run|bool
+        - (ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux' or ansible_distribution == 'RedHat')
 
     # On lance un reboot
     - name: "REBOOT | reboot triggered"
