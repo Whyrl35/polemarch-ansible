@@ -1,0 +1,16 @@
+---
+- name: Playbook to upgrade package on host
+  hosts: "{{ target }}"
+  gather_facts: no
+
+  tasks:
+    - name: Debug
+      debug:
+        msg: "Will upgrade package on host"
+
+    - name: rebooting
+      apt:
+        name: "*"
+        state: latest
+      become: true
+      become_user: root

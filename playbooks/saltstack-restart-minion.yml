@@ -1,0 +1,15 @@
+---
+- name: Playbook to restart salt-minion on target
+  hosts: "{{ target }}"
+  gather_facts: no
+
+  tasks:
+    - name: Debug
+      debug:
+        msg: "Will restart salt-minion service on host"
+
+    - name: restarting salt-minion
+      service:
+        name: salt-minion
+        state: restarted
+      become: true
